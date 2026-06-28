@@ -4,7 +4,7 @@
  * - Soporte para notificaciones push via showNotification
  */
 
-const VERSION = "calendariogym-v1.0.3";
+const VERSION = "calendariogym-v1.0.4";
 const CORE = [
   "./",
   "./index.html",

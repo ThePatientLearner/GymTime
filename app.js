@@ -115,29 +115,40 @@ function autoRoutineId(label) {
 }
 
 // Devuelve la lista de fechas (YYYY-MM-DD) que la autorutina cubriría desde hoy
-function autoRoutineDates(weeks) {
+// dows: array de dow (0..6) ya ordenados cronológicamente
+function autoRoutineDatesFor(weeks, dows) {
   const today = todayISO();
   const dow = parseISO(today).getDay(); // 0..6
   const daysToMonday = (8 - dow) % 7; // si hoy es lunes -> 0
   const startMonday = addDays(today, daysToMonday);
   const out = [];
   for (let w = 0; w < weeks; w++) {
-    for (let d = 0; d < AUTO_ROUTINE.days.length; d++) {
-      const day = AUTO_ROUTINE.days[d];
-      const isoDate = addDays(startMonday, w * 7 + d);
-      out.push({ isoDate, day });
+    for (let d = 0; d < dows.length; d++) {
+      const targetDow = dows[d];
+      // offset dentro de la semana: targetDow - 1 (lunes=0) o targetDow si lunes=1
+      const dowOffset = targetDow === 0 ? 6 : targetDow - 1;
+      const isoDate = addDays(startMonday, w * 7 + dowOffset);
+      out.push({ isoDate, dow: targetDow, slotIndex: d });
     }
   }
   return out;
 }
 
 // Cuenta cuántos días del plan ya tienen ejercicios del usuario
-function autoRoutineOverlap(weeks) {
-  const list = autoRoutineDates(weeks);
+function autoRoutineOverlapFor(dows, weeks) {
+  const list = autoRoutineDatesFor(weeks, dows);
   return list.filter((x) => {
     const existing = state.data.schedule[x.isoDate];
     return existing && existing.length > 0;
   });
+}
+
+// (legacy) para compatibilidad con código anterior
+function autoRoutineDates(weeks) {
+  return autoRoutineDatesFor(weeks, AUTO_ROUTINE.days.map((d) => d.dow));
+}
+function autoRoutineOverlap(weeks) {
+  return autoRoutineOverlapFor(AUTO_ROUTINE.days.map((d) => d.dow), weeks);
 }
 
 // ============================================================
@@ -1397,44 +1408,49 @@ async function init() {
 
 function openAutoRoutineModal() {
   const weeks = AUTO_ROUTINE.weeks;
-  const dates = autoRoutineDates(weeks);
-  const overlaps = autoRoutineOverlap(weeks);
+  const selectedDays = new Set(AUTO_ROUTINE.days.map((d) => d.dow)); // por defecto L-M-X-J
 
-  const previewDays = AUTO_ROUTINE.days
-    .map((d) => {
-      const items = d.exercises
-        .map((it) => {
-          const ex = state.exercisesById.get(it.eid);
-          return ex
-            ? `<span class="rex">${escapeHTML(ex.name)} · ${it.sets}×${escapeHTML(it.reps)}</span>`
-            : "";
-        })
-        .join("");
-      const totalSets = d.exercises.reduce((s, it) => s + (it.sets || 0), 0);
-      return `
-        <div class="routine-card" style="margin-bottom: 10px;">
-          <div class="rname">${DAYS_LONG_ES[d.dow]} · ${escapeHTML(d.label)}</div>
-          <div class="rmeta">${d.exercises.length} ejercicios · ${totalSets} series</div>
-          <div class="rex-list">${items}</div>
-        </div>
-      `;
-    })
-    .join("");
+  const renderPreview = () => {
+    // En orden cronológico
+    const ordered = [...selectedDays].sort((a, b) => a - b);
+    const list = ordered
+      .map((dow, i) => {
+        const d = AUTO_ROUTINE.days[i] || AUTO_ROUTINE.days[AUTO_ROUTINE.days.length - 1];
+        const items = d.exercises
+          .map((it) => {
+            const ex = state.exercisesById.get(it.eid);
+            return ex
+              ? `<span class="rex">${escapeHTML(ex.name)} · ${it.sets}×${escapeHTML(it.reps)}</span>`
+              : "";
+          })
+          .join("");
+        const totalSets = d.exercises.reduce((s, it) => s + (it.sets || 0), 0);
+        return `
+          <div class="routine-card" style="margin-bottom: 10px;">
+            <div class="rname">${DAYS_LONG_ES[dow]} · ${escapeHTML(d.label)}</div>
+            <div class="rmeta">${d.exercises.length} ejercicios · ${totalSets} series</div>
+            <div class="rex-list">${items}</div>
+          </div>
+        `;
+      })
+      .join("");
+    return list || `<p class="muted">Selecciona al menos un día.</p>`;
+  };
 
-  const body = document.getElementById("modal-auto-body");
-  body.innerHTML = `
-    <h3>✨ Autorutina 4 días</h3>
-    <p class="muted">
-      Pulsa una vez y te genero las plantillas y las programo durante
-      <strong>${weeks} semanas</strong> seguidas.
-    </p>
+  const renderDaysPicker = () => {
+    return DAYS_ES.map(
+      (d, i) =>
+        `<div class="day-pill ${selectedDays.has(i) ? "active" : ""}" data-dow="${i}" role="button">${d}</div>`,
+    ).join("");
+  };
 
-    <div class="card" style="margin: 12px 0;">
-      <h4 style="margin-top:0;">📋 Plan semanal</h4>
-      ${previewDays}
-    </div>
-
-    <div class="card" style="background: var(--bg-elev-2);">
+  const renderSummary = () => {
+    const ordered = [...selectedDays].sort((a, b) => a - b);
+    if (ordered.length === 0)
+      return `<p class="muted">Selecciona al menos un día para continuar.</p>`;
+    const dates = autoRoutineDatesFor(weeks, ordered);
+    const overlaps = autoRoutineOverlapFor(ordered, weeks);
+    return `
       <p style="margin: 0;">
         <strong>${dates.length} sesiones</strong> programadas ·
         primer entreno: <strong>${fmtLong(dates[0].isoDate)}</strong>
@@ -1442,13 +1458,37 @@ function openAutoRoutineModal() {
       ${
         overlaps.length
           ? `<p class="muted small" style="margin: 8px 0 0;">
-              ⚠️ ${overlaps.length} de esos días ya tienen ejercicios. Se
-              sobrescribirán al aplicar.
+              ⚠️ ${overlaps.length} de esos días ya tienen ejercicios. Se sobrescribirán.
             </p>`
-          : `<p class="muted small" style="margin: 8px 0 0;">
-              Los días están vacíos, no se pierde nada.
-            </p>`
+          : `<p class="muted small" style="margin: 8px 0 0;">Los días están vacíos, no se pierde nada.</p>`
       }
+    `;
+  };
+
+  const body = document.getElementById("modal-auto-body");
+  body.innerHTML = `
+    <h3>✨ Autorutina</h3>
+    <p class="muted">
+      Pulsa una vez y te genero las plantillas y las programo durante
+      <strong>${weeks} semanas</strong> seguidas.
+    </p>
+
+    <div class="card" style="margin: 12px 0;">
+      <h4 style="margin-top:0;">📅 Días de entreno</h4>
+      <p class="muted small" style="margin: 4px 0 10px;">
+        Selecciona los días. Se repetirán cada semana. Los músculos se
+        asignan en orden cronológico: Pecho → Piernas → Brazos → Espalda.
+      </p>
+      <div class="day-picker" id="auto-days">${renderDaysPicker()}</div>
+    </div>
+
+    <div class="card" style="margin: 12px 0; padding: 12px;">
+      <h4 style="margin-top:0;">📋 Plan semanal</h4>
+      <div id="auto-preview">${renderPreview()}</div>
+    </div>
+
+    <div class="card" id="auto-summary" style="background: var(--bg-elev-2);">
+      ${renderSummary()}
     </div>
 
     <div class="form-row">
@@ -1461,26 +1501,62 @@ function openAutoRoutineModal() {
       <button class="btn primary" id="auto-apply">✨ Aplicar</button>
     </div>
   `;
+
   body.querySelectorAll("[data-close]").forEach((b) =>
     b.addEventListener("click", () => closeModal("modal-auto")),
   );
+
+  const refresh = () => {
+    body.querySelector("#auto-preview").innerHTML = renderPreview();
+    body.querySelector("#auto-summary").innerHTML = renderSummary();
+    body.querySelector("#auto-days").innerHTML = renderDaysPicker();
+    body.querySelectorAll("#auto-days .day-pill").forEach((p) =>
+      p.addEventListener("click", onPick),
+    );
+    const applyBtn = body.querySelector("#auto-apply");
+    applyBtn.disabled = selectedDays.size === 0;
+    applyBtn.style.opacity = selectedDays.size === 0 ? "0.5" : "1";
+  };
+
+  const onPick = (ev) => {
+    const dow = Number(ev.currentTarget.getAttribute("data-dow"));
+    if (selectedDays.has(dow)) selectedDays.delete(dow);
+    else selectedDays.add(dow);
+    refresh();
+  };
+
+  body.querySelectorAll("#auto-days .day-pill").forEach((p) =>
+    p.addEventListener("click", onPick),
+  );
+
+  body.querySelector("#auto-weeks").addEventListener("input", (e) => {
+    AUTO_ROUTINE.weeks = Math.max(
+      1,
+      Math.min(12, Number(e.target.value) || 4),
+    );
+    refresh();
+  });
+
   body.querySelector("#auto-apply").addEventListener("click", () => {
+    const ordered = [...selectedDays].sort((a, b) => a - b);
+    if (ordered.length === 0) return;
     const w = Math.max(
       1,
       Math.min(12, Number(body.querySelector("#auto-weeks").value) || weeks),
     );
-    applyAutoRoutine(w);
+    applyAutoRoutine(w, ordered);
     closeModal("modal-auto");
   });
+
+  refresh();
   openModal("modal-auto");
 }
 
-function applyAutoRoutine(weeks) {
+function applyAutoRoutine(weeks, dows) {
+  // dows: array de dow (0..6) ya en orden cronológico. Slots por dow.
   // 1) Crear / actualizar las 4 plantillas con el nombre estándar
-  const templateIds = {};
   for (const d of AUTO_ROUTINE.days) {
     const rid = autoRoutineId(d.label);
-    templateIds[rid] = d.label;
     state.data.routines[rid] = {
       name: `💪 ${d.label} (Auto)`,
       items: d.exercises.map((it) => ({
@@ -1493,10 +1569,12 @@ function applyAutoRoutine(weeks) {
   }
 
   // 2) Aplicar a las próximas N semanas (sobrescribiendo días previos)
-  const dates = autoRoutineDates(weeks);
+  const dates = autoRoutineDatesFor(weeks, dows);
   let filled = 0;
   for (const x of dates) {
-    const d = x.day;
+    // Cada slot (0,1,2,3...) recibe un músculo distinto del plan (Pecho, Piernas, Brazos, Espalda)
+    const muscleIdx = Math.min(x.slotIndex, AUTO_ROUTINE.days.length - 1);
+    const d = AUTO_ROUTINE.days[muscleIdx];
     state.data.schedule[x.isoDate] = d.exercises.map((it) => ({
       eid: it.eid,
       sets: it.sets,
@@ -1515,7 +1593,7 @@ function applyAutoRoutine(weeks) {
   renderRoutines();
   renderToday();
   renderCalendar();
-  toast(`✨ ${filled} sesiones listas (${weeks} semanas × ${AUTO_ROUTINE.days.length} días)`);
+  toast(`✨ ${filled} sesiones listas (${weeks} semanas × ${dows.length} días)`);
 }
 
 function openTemplatePicker() {
