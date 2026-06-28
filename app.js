@@ -114,6 +114,20 @@ function autoRoutineId(label) {
   return "auto-" + label.toLowerCase();
 }
 
+// Devuelve el label del músculo si ese día viene de la autorutina (todos sus items
+// comparten el mismo fromRoutine auto-*). Devuelve null si no es día de autorutina.
+function getDayMuscleLabel(isoDate) {
+  const items = state.data.schedule[isoDate];
+  if (!items || items.length === 0) return null;
+  const rid = items[0].fromRoutine;
+  if (!rid || !rid.startsWith("auto-")) return null;
+  // todos los items deben tener el mismo fromRoutine
+  for (const it of items) if (it.fromRoutine !== rid) return null;
+  // Capitaliza el segmento tras "auto-"
+  const tail = rid.slice(5); // "pecho"
+  return tail.charAt(0).toUpperCase() + tail.slice(1);
+}
+
 // Devuelve la lista de fechas (YYYY-MM-DD) que la autorutina cubriría desde hoy
 // dows: array de dow (0..6) ya ordenados cronológicamente
 function autoRoutineDatesFor(weeks, dows) {
@@ -304,12 +318,18 @@ function remoteUrl(path) {
 function renderToday() {
   const date = state.selectedDate;
   document.getElementById("topbar-date").textContent = fmtLong(date);
-  document.getElementById("topbar-sub").textContent =
-    diffDays(date, todayISO()) === 0
-      ? "Hoy"
-      : diffDays(date, todayISO()) > 0
-        ? `En ${diffDays(date, todayISO())} días`
-        : `Hace ${-diffDays(date, todayISO())} días`;
+  const muscle = getDayMuscleLabel(date);
+  const subEl = document.getElementById("topbar-sub");
+  if (muscle) {
+    subEl.innerHTML = `<span class="muscle-pill">💪 ${escapeHTML(muscle)}</span>`;
+  } else {
+    subEl.textContent =
+      diffDays(date, todayISO()) === 0
+        ? "Hoy"
+        : diffDays(date, todayISO()) > 0
+          ? `En ${diffDays(date, todayISO())} días`
+          : `Hace ${-diffDays(date, todayISO())} días`;
+  }
 
   const items = state.data.schedule[date] || [];
   const summary = document.getElementById("day-summary");
@@ -424,11 +444,16 @@ function renderCalendar() {
       const isToday = iso === today ? "is-today" : "";
       const isSel = iso === state.selectedDate ? "is-selected" : "";
       const has = items.length ? "has-workout" : "";
+      const muscle = getDayMuscleLabel(iso);
+      const muscleTag = muscle
+        ? `<div class="muscle-tag">💪 ${escapeHTML(muscle)}</div>`
+        : "";
       return `
-      <div class="week-day ${isToday} ${isSel} ${has}" data-date="${iso}">
+      <div class="week-day ${isToday} ${isSel} ${has} ${muscle ? "is-auto" : ""}" data-date="${iso}">
         <div class="dow">${DAYS_ES[d.getDay()]}</div>
         <div class="dom">${d.getDate()}</div>
         <div class="count">${items.length > 0 ? items.length + " ej" : "—"}</div>
+        ${muscleTag}
       </div>`;
     })
     .join("");

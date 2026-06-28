@@ -275,6 +275,20 @@ hr {
   color: var(--text-dim);
 }
 
+.muscle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #ff8a3d 0%, #ff6a13 100%);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 2px 8px rgba(255, 106, 19, 0.25);
+}
+
 /* ============================================================
    Buttons
    ============================================================ */
@@ -557,6 +571,23 @@ hr {
 .week-day.has-workout .count {
   background: var(--accent);
   color: white;
+}
+.muscle-tag {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #ff8a3d 0%, #ff6a13 100%);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 6px;
+  align-self: stretch;
+  text-align: center;
+}
+.week-day.is-auto {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(255, 138, 61, 0.06), transparent);
 }
 .section-title {
   font-size: 13px;
