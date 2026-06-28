@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Calendario Gym</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Gym" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ========= SIDEBAR (escritorio ≥ 1024px) ========= -->
+    <aside class="sidebar" aria-label="Navegación principal">
+      <div class="sidebar-brand">
+        <div class="logo">🏋️</div>
+        <div>
+          <div class="brand-name">Gym</div>
+          <div class="brand-sub">Calendario</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="sidebar-link active" data-nav="today">
+          <span class="ic">🏠</span><span>Hoy</span>
+        </button>
+        <button class="sidebar-link" data-nav="calendar">
+          <span class="ic">📅</span><span>Semana</span>
+        </button>
+        <button class="sidebar-link" data-nav="routines">
+          <span class="ic">📋</span><span>Rutinas</span>
+        </button>
+        <button class="sidebar-link" data-nav="library">
+          <span class="ic">🔍</span><span>Ejercicios</span>
+        </button>
+        <button class="sidebar-link" data-nav="settings">
+          <span class="ic">⚙️</span><span>Ajustes</span>
+        </button>
+      </nav>
+      <div class="sidebar-section">Atajos</div>
+      <div style="padding: 0 12px 12px; display: flex; flex-direction: column; gap: 6px;">
+        <button
+          class="btn ghost"
+          style="width: 100%; justify-content: flex-start;"
+          data-action="add-exercise"
+        >
+          + Ejercicio hoy
+        </button>
+        <button
+          class="btn primary"
+          style="width: 100%; justify-content: flex-start;"
+          data-action="auto-routine"
+        >
+          ✨ Autorutina 4 días
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        CalendarioGym v1.0<br />
+        <span style="opacity: 0.7">Local-first · PWA</span>
+      </div>
+    </aside>
+
+    <!-- ========= TOPBAR ========= -->
+    <header class="topbar">
+      <button class="icon-btn" id="btn-prev" aria-label="Anterior">‹</button>
+      <div class="topbar-title">
+        <div id="topbar-date" class="topbar-date">—</div>
+        <div id="topbar-sub" class="topbar-sub">—</div>
+      </div>
+      <button class="icon-btn" id="btn-next" aria-label="Siguiente">›</button>
+      <button class="icon-btn ghost" id="btn-today" aria-label="Hoy">
+        Hoy
+      </button>
+    </header>
+
+    <!-- ========= MAIN ========= -->
+    <main class="main">
+      <!-- HOY -->
+      <section class="view" id="view-today" data-view="today">
+        <div class="day-summary" id="day-summary"></div>
+        <div class="day-list" id="day-list"></div>
+        <div class="empty-state" id="day-empty" hidden>
+          <div class="empty-emoji">🏋️</div>
+          <h3>Día libre</h3>
+          <p>Añade ejercicios o aplica una rutina.</p>
+          <div class="empty-actions">
+            <button class="btn primary" data-action="add-exercise">
+              + Ejercicio
+            </button>
+            <button class="btn ghost" data-action="apply-template">
+              Rutina…
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- CALENDARIO -->
+      <section class="view" id="view-calendar" data-view="calendar" hidden>
+        <div class="calendar-header">
+          <button class="icon-btn" id="cal-prev-week" aria-label="Semana ant">
+            ‹
+          </button>
+          <h3 id="cal-range">—</h3>
+          <button class="icon-btn" id="cal-next-week" aria-label="Semana sig">
+            ›
+          </button>
+        </div>
+        <div class="week-grid" id="week-grid"></div>
+        <h4 class="section-title">Resumen semanal</h4>
+        <div class="week-summary" id="week-summary"></div>
+      </section>
+
+      <!-- RUTINAS -->
+      <section class="view" id="view-routines" data-view="routines" hidden>
+        <div class="view-actions" style="gap: 8px;">
+          <button class="btn primary" id="btn-auto-routine">
+            ✨ Autorutina 4 días
+          </button>
+          <button class="btn ghost" id="btn-new-routine">
+            + Nueva rutina
+          </button>
+        </div>
+        <div class="routine-list" id="routine-list"></div>
+        <div class="empty-state" id="routine-empty" hidden>
+          <div class="empty-emoji">📋</div>
+          <h3>Sin rutinas</h3>
+          <p>Crea plantillas reutilizables (Push, Pull, Legs…).</p>
+        </div>
+      </section>
+
+      <!-- BIBLIOTECA -->
+      <section class="view" id="view-library" data-view="library" hidden>
+        <div class="search-bar">
+          <input
+            type="search"
+            id="search-input"
+            placeholder="Buscar ejercicio (ej. press banca)…"
+            autocomplete="off"
+          />
+        </div>
+        <div class="filter-chips" id="filter-chips"></div>
+        <div class="exercise-grid" id="exercise-grid"></div>
+        <div class="loading-more" id="loading-more" hidden>Cargando…</div>
+      </section>
+
+      <!-- AJUSTES -->
+      <section class="view" id="view-settings" data-view="settings" hidden>
+        <div class="card">
+          <h3>🔔 Recordatorios</h3>
+          <p class="muted">
+            Te avisaré cuando llegue la hora de entrenar. Funciona mientras la
+            app esté abierta o instalada como PWA.
+          </p>
+          <div class="form-row">
+            <label class="switch-row">
+              <span>Activar recordatorios</span>
+              <input type="checkbox" id="set-reminders" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label>Hora</label>
+            <input type="time" id="set-reminder-time" value="18:00" />
+          </div>
+          <div class="form-row">
+            <label>Días</label>
+            <div class="day-picker" id="set-reminder-days"></div>
+          </div>
+          <div class="form-row">
+            <button class="btn" id="btn-test-notif">
+              🔔 Probar notificación
+            </button>
+            <p id="notif-status" class="muted small"></p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>💾 Datos</h3>
+          <p class="muted">
+            Todo se guarda en este dispositivo. Haz copias de seguridad
+            periódicas.
+          </p>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-export">↓ Exportar JSON</button>
+            <button class="btn" id="btn-import">↑ Importar</button>
+            <input
+              type="file"
+              id="import-file"
+              accept="application/json,.json"
+              hidden
+            />
+          </div>
+          <div class="form-row">
+            <button class="btn danger ghost" id="btn-clear">
+              Borrar todos los datos
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>ℹ️ Acerca de</h3>
+          <p class="muted">
+            CalendarioGym v1.0 · Dataset de
+            <a
+              href="https://github.com/hasaneyldrm/exercises-dataset"
+              target="_blank"
+              rel="noopener"
+              >hasaneyldrm/exercises-dataset</a
+            >
+            (uso educativo).
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <!-- ========= BOTTOM NAV ========= -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-nav="today">
+        <span class="nav-ico">🏠</span><span>Hoy</span>
+      </button>
+      <button class="nav-btn" data-nav="calendar">
+        <span class="nav-ico">📅</span><span>Semana</span>
+      </button>
+      <button class="nav-btn" data-nav="routines">
+        <span class="nav-ico">📋</span><span>Rutinas</span>
+      </button>
+      <button class="nav-btn" data-nav="library">
+        <span class="nav-ico">🔍</span><span>Ejercicios</span>
+      </button>
+      <button class="nav-btn" data-nav="settings">
+        <span class="nav-ico">⚙️</span><span>Ajustes</span>
+      </button>
+    </nav>
+
+    <!-- ========= FAB ========= -->
+    <button class="fab" id="fab" title="Añadir ejercicio">+</button>
+
+    <!-- ========= MODAL: detalle ejercicio ========= -->
+    <div class="modal" id="modal-exercise" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet">
+        <button class="modal-close" data-close aria-label="Cerrar">×</button>
+        <div class="modal-body" id="modal-exercise-body"></div>
+      </div>
+    </div>
+
+    <!-- ========= MODAL: añadir/editar ejercicio del día ========= -->
+    <div class="modal" id="modal-add" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet">
+        <button class="modal-close" data-close aria-label="Cerrar">×</button>
+        <div class="modal-body">
+          <h3 id="modal-add-title">Añadir ejercicio</h3>
+          <div class="form-row">
+            <label>Buscar ejercicio</label>
+            <input
+              type="search"
+              id="add-search"
+              placeholder="Empieza a escribir…"
+              autocomplete="off"
+            />
+          </div>
+          <div class="picker-list" id="add-picker"></div>
+          <hr />
+          <div class="form-row grid-2">
+            <div>
+              <label>Series</label>
+              <input type="number" id="add-sets" min="1" max="20" value="3" />
+            </div>
+            <div>
+              <label>Reps</label>
+              <input type="text" id="add-reps" value="8-12" />
+            </div>
+          </div>
+          <div class="form-row grid-2">
+            <div>
+              <label>Peso (kg)</label>
+              <input type="text" id="add-weight" placeholder="ej. 20" />
+            </div>
+            <div>
+              <label>Descanso (s)</label>
+              <input type="number" id="add-rest" min="0" value="90" />
+            </div>
+          </div>
+          <div class="form-row">
+            <label>Notas</label>
+            <textarea
+              id="add-notes"
+              rows="2"
+              placeholder="RPE, tempo, observaciones…"
+            ></textarea>
+          </div>
+          <div class="btn-row right">
+            <button class="btn ghost" data-close>Cancelar</button>
+            <button class="btn primary" id="add-save">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========= MODAL: rutinas ========= -->
+    <div class="modal" id="modal-routine" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet">
+        <button class="modal-close" data-close aria-label="Cerrar">×</button>
+        <div class="modal-body" id="modal-routine-body"></div>
+      </div>
+    </div>
+
+    <!-- ========= MODAL: autorutina ========= -->
+    <div class="modal" id="modal-auto" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-sheet">
+        <button class="modal-close" data-close aria-label="Cerrar">×</button>
+        <div class="modal-body" id="modal-auto-body"></div>
+      </div>
+    </div>
+
+    <!-- ========= TOAST ========= -->
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
