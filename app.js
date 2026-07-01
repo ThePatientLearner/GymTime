@@ -8,7 +8,9 @@
 
 const STORAGE_KEY = "calendariogym.v1";
 const SCHEMA_VERSION = 1;
-const GITHUB_RAW = "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/";
+// Mirror del dataset (el repo upstream quitó las imágenes por copyright el 30/06/2026;
+// usamos un fork espejo que aún conserva las 1324 imágenes + GIFs).
+const GITHUB_RAW = "https://raw.githubusercontent.com/ievenight/exercises-dataset/main/";
 
 const CATEGORY_LABELS = {
   back: "Espalda",
@@ -310,6 +312,72 @@ async function loadExercises() {
 function remoteUrl(path) {
   return GITHUB_RAW + path;
 }
+
+// Emoji por categoría de músculo — usado como fallback visual cuando la
+// imagen remota del dataset falla en cargar (dataset upstream quitó las
+// imágenes en junio 2026 por un aviso de copyright).
+const CATEGORY_EMOJI = {
+  back: "🔙",
+  cardio: "🏃",
+  chest: "💪",
+  "lower arms": "🦾",
+  "lower legs": "🦵",
+  neck: "🧎",
+  shoulders: "🏋️",
+  "upper arms": "💪",
+  "upper legs": "🦵",
+  waist: "🧘",
+};
+function emojiForCategory(cat) {
+  return CATEGORY_EMOJI[cat] || "🏋️";
+}
+
+// Si una imagen falla al cargar, la sustituimos por un placeholder con el
+// emoji del músculo. Usamos event delegation para cubrir TODAS las <img>
+// que generamos en la app (thumb, ex-card, gif de detalle, picker…).
+document.addEventListener(
+  "error",
+  (ev) => {
+    const t = ev.target;
+    if (!(t instanceof HTMLImageElement)) return;
+    if (t.dataset.fallbackDone === "1") return;
+    t.dataset.fallbackDone = "1";
+
+    // Determinar el emoji apropiado para el fallback
+    let emoji = "🏋️";
+    const id = t.dataset.detail;
+    if (id && state.exercisesById && state.exercisesById.has(id)) {
+      emoji = emojiForCategory(state.exercisesById.get(id).category);
+    } else {
+      const dayItem = t.closest(".day-item");
+      if (dayItem) {
+        const idx = Number(dayItem.dataset.idx);
+        const items = state.data.schedule[state.selectedDate] || [];
+        const it = items[idx];
+        if (it && state.exercisesById) {
+          const ex = state.exercisesById.get(it.eid);
+          if (ex) emoji = emojiForCategory(ex.category);
+        }
+      } else {
+        const card = t.closest(".ex-card");
+        if (card) {
+          const cardId = card.dataset.id;
+          const ex = state.exercisesById && state.exercisesById.get(cardId);
+          if (ex) emoji = emojiForCategory(ex.category);
+        }
+      }
+    }
+
+    // Sustituir el <img> por un <div> con el emoji. No podemos usar
+    // ::before/::after en <img> (void element), así que cambiamos el nodo.
+    const placeholder = document.createElement("div");
+    placeholder.className = t.className + " img-fallback";
+    placeholder.setAttribute("data-fallback", emoji);
+    if (t.dataset.detail) placeholder.dataset.detail = t.dataset.detail;
+    t.parentNode.replaceChild(placeholder, t);
+  },
+  true, // capture: error no burbujea, hay que escuchar en captura
+);
 
 // ============================================================
 // Renderizado — vista HOY
